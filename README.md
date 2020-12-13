@@ -22,5 +22,5 @@ Goals of the project
 ### tidy_data.txt
 - The tidy data output
 
-###Codebook.md
+### Codebook.md
 - Explanation of the dataset and the column values
