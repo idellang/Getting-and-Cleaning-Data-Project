@@ -1,0 +1,162 @@
+---
+title: "Script"
+author: "Me"
+date: "12/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(data.table)
+library(rio)
+```
+
+Goals
+- Merge training and test sets into one dataset
+- Extracts only measurements on the mean and standard dev of each measurement
+- uses descriptive activity names to name activities in the dataset
+- appropriately labels the dataset with descriptive variable names
+- Create a second independent tidy set with average for each activity and each subject
+
+
+Load activity text and features text and get only mean and std dev
+Steps
+- Import the two files activity labels and features
+- Extract those with mean and std
+- remove those with string 'Freq'
+- get the indices and names for column names and subsetting
+```{r}
+activity = import(file.path(getwd(), 'UCI HAR DATASET/activity_labels.txt')) %>%
+      as_tibble() %>%
+      rename(index = V1, activity = V2)
+
+features = import(file.path(getwd(), 'UCI HAR DATASET/features.txt')) %>%
+      as_tibble() %>%
+       rename(index = V1, features = V2)
+
+std_mean_features = features %>%
+      filter(grepl('mean()|std()', features)) %>%
+      filter(!grepl('Freq', features)) %>%
+      .$index
+
+col_names = features %>%
+      filter(index %in% std_mean_features) %>%
+      mutate(features = str_replace_all(features, '[()]','')) %>%
+      .$features
+```
+
+#Train dataset
+
+Steps
+- import traing dataset
+- set the column names using the created variable col names
+- get the Y_train and left join with the activity data to get the activities
+- get the subject train data
+- use cbind to combine the three dataframes
+```{r}
+train = import(file.path(getwd(), 'UCI HAR DATASET/train/X_train.txt')) %>%
+      select(std_mean_features)
+colnames(train) = col_names
+
+
+y_train = import(file.path(getwd(), 'UCI HAR DATASET/train/Y_train.txt')) %>%
+      as_tibble() %>%
+      rename(index = V1) %>%
+      left_join(activity) %>%
+      select(activity)
+
+subject_train = import(file.path(getwd(), 'UCI HAR DATASET/train/subject_train.txt')) %>%
+      as_tibble() %>%
+      rename(subject = V1)
+
+train = cbind(subject_train, y_train, train)
+
+train
+```
+#Test dataset
+Steps
+- the same as the procedure with the train dataset
+
+```{r}
+
+test = import(file.path(getwd(), 'UCI HAR DATASET/test/X_test.txt')) %>%
+      select(std_mean_features)
+
+colnames(test) = col_names
+
+y_test = import(file.path(getwd(), 'UCI HAR DATASET/test/y_test.txt')) %>%
+      as_tibble() %>%
+      rename(index = V1) %>%
+      left_join(activity) %>%
+      select(activity)
+
+subject_test = import(file.path(getwd(), 'UCI HAR DATASET/test/subject_test.txt')) %>%
+      as_tibble() %>%
+      rename(subject = V1)
+
+test = cbind(subject_test, y_test, test)
+```
+## Final data
+Steps
+- use rbind to vertically combine the two data
+- mutate subject and activities as factor for analysis
+- gather every column except for subject and activity
+- use group by to compute for mean value
+- spread the key variable and value to create a wide dataframe
+
+```{r}
+all_data =  rbind(train, test)
+final = all_data %>%
+      mutate(subject = as.factor(subject),
+             activity = as.factor(activity)) %>%
+      gather('key','value', -c(subject, activity)) %>%
+      group_by(subject, activity, key) %>%
+      summarise(value = mean(value)) %>%
+      spread(key = key, value = value)
+
+```
+#Export data
+```{r}
+final %>%
+   export('tidyData.txt')
+```
+
+
+#Check exported data
+```{r}
+tidy_data = import('tidyData.txt')
+tidy_data
+```
+```{r}
+tidy_data %>%
+   write.table('tidy_data.txt', row.names = F)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
